@@ -16,7 +16,7 @@ path = "src/lib.rs"
 [features]
 capnp-recompile = ["capnpc", "capnp"]
 coroutines = ["coio", "tls"]
-default = ["syslog", "kafka-output", "file", "redis", "capnp-recompile", "tls", "gelf", "ltsv"]
+default = ["syslog", "file", "redis", "capnp-recompile", "gelf", "ltsv"]
 redis-input = ["redis"]
 kafka-output = ["kafka"]
 tls = ["openssl"]

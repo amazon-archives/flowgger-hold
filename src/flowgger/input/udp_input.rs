@@ -4,7 +4,7 @@ use crate::flowgger::decoder::Decoder;
 use crate::flowgger::encoder::Encoder;
 use flate2::read::{GzDecoder, ZlibDecoder};
 use std::io::{stderr, Read, Write};
-use std::net;
+use std::net::SocketAddr;
 use std::net::UdpSocket;
 use std::str;
 use std::sync::mpsc::SyncSender;
@@ -19,7 +19,7 @@ const MAX_COMPRESSION_RATIO: usize = 5;
 ///
 /// [`Config`]: ../config/struct.Config.html
 pub struct UdpInput {
-    listen: net::SocketAddr,
+    listen: SocketAddr,
 }
 
 impl UdpInput {
@@ -40,7 +40,7 @@ impl UdpInput {
                 x.as_str().expect("input.listen must be an ip:port string")
             })
             .to_owned();
-        let bind_address: net::SocketAddr = listen
+        let bind_address: SocketAddr = listen
             .parse()
             .expect("unable to parse ip:port string from input.listen");
         UdpInput {
@@ -161,7 +161,7 @@ mod test {
         let config =
             Config::from_string(format!("[input]\nlisten = \"{}\"", listen_ip).as_str()).unwrap();
         let input = UdpInput::new(&config);
-        let listen_addr: net::SocketAddr = listen_ip.parse().unwrap();
+        let listen_addr: SocketAddr = listen_ip.parse().unwrap();
         assert_eq!(input.listen, listen_addr);
     }
 
@@ -176,7 +176,7 @@ mod test {
     fn test_udp_input_default_constructor() {
         let config = Config::from_string("").unwrap();
         let input = UdpInput::new(&config);
-        let default_addr: net::SocketAddr = DEFAULT_LISTEN.parse().unwrap();
+        let default_addr: SocketAddr = DEFAULT_LISTEN.parse().unwrap();
         assert_eq!(input.listen, default_addr);
     }
 
