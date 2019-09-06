@@ -167,7 +167,7 @@ mod test {
 
     #[test]
     #[should_panic(expected = "Syntax error - config file is not valid TOML")]
-    fn test_config_fromt_path_bad_format() {
+    fn test_config_from_path_bad_format() {
         let _config = Config::from_path("tests/resources/bad_config.toml").unwrap();
     }
 
@@ -175,7 +175,7 @@ mod test {
     #[should_panic(
         expected = "Os { code: 2, kind: NotFound, message: \"No such file or directory\" }"
     )]
-    fn test_config_fromt_path_no_file() {
+    fn test_config_from_path_no_file() {
         let _config = Config::from_path("doesnotexist.toml").unwrap();
     }
 }
