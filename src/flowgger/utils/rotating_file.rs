@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_rotation_2files() {
-        let file_base = "test_log.log";
+        let file_base = "/f/test_log.log";
         let file_rotated = "test_log.0";
         let file_rotated2 = "test_log.1";
 
@@ -201,6 +201,17 @@ mod tests {
         let _ = fs::remove_file(file_rotated2);
 
         let mut rotating_file = RotatingFile::new(file_base, 16, 2);
+        let result = rotating_file.open();
+        if result.is_err() {
+            println!("Error opening log file {}: {}", file_base, result.unwrap_err());
+            let result2 = fs::write("d.d", "test");
+            if result2.is_err() {
+                println!("Error opening local file: {}", result2.unwrap_err());
+            }
+            else {
+                let _ = fs::remove_file("d.d");
+            }
+        }
         assert!(rotating_file.open().is_ok());
 
         // No rotation yet
