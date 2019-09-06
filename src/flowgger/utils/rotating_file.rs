@@ -18,7 +18,13 @@ pub struct RotatingFile {
 
 impl RotatingFile {
     /// Create a new rotating file, which implements the Write trait
-    /// Files are rotated when
+    /// Files are rotated when the data to write in the current file is going to reach the specified limit.
+    /// During a rotation:
+    /// - each existing file is renamed 'basename.{n}' -> 'basename.{n+1}', starting with n = maxfiles -2 up to 0.
+    ///     The oldest 'basename.{maxfiles -1}' is therefore overwritten and the old data are lost
+    /// - the current file is renamed 'basename' -> 'basename.0'
+    /// - A new file 'basename' is created
+    ///
     ///
     /// # Parameters
     /// - 'basename': Original file name and path.
