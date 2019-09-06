@@ -10,7 +10,7 @@ use std::thread;
 use std::io::stderr;
 const FILE_DEFAULT_BUFFER_SIZE: usize = 0;
 const FILE_DEFAULT_ROTATION_SIZE: usize = 0;
-const FILE_DEFAULT_ROTATION_MAXFILES: i32 = 2;
+const FILE_DEFAULT_ROTATION_MAXFILES: i32 = 50;
 
 /// Output of type file, to store the data to a file
 pub struct FileOutput {
