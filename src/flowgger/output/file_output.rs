@@ -186,19 +186,26 @@ mod tests {
     use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
     use std::sync::{Arc, Mutex};
     use std::{thread, time};
+    extern crate tempdir;
+    use tempdir::TempDir;
+    use std::io::Result;
 
     /// Helper for the test to initialize some test data, create a writer,  and verify it
     struct WriterTest {
-        file_base: &'static str,
+        file_base: String,
         test_patterns: Vec<&'static str>,
+        _temp_dir:TempDir,
     }
 
     impl WriterTest {
-        fn new(file_base: &'static str) -> Self {
-            Self {
+        fn new(file_name: &'static str) -> Result<Self> {
+            let temp_dir = TempDir::new("test_file_output")?;
+            let file_base = temp_dir.path().join(file_name).to_string_lossy().to_string();
+            Ok(Self {
                 file_base,
                 test_patterns: vec!["abcdef", "ghijkl", "012345", "678901"],
-            }
+                _temp_dir:temp_dir,
+            })
         }
 
         fn setup_writer(
@@ -209,7 +216,6 @@ mod tests {
             expected_buffsize: usize,
         ) -> Box<dyn Write> {
             let fp = FileOutput::new(&cfg);
-            let _ = fs::remove_file(self.file_base);
 
             assert_eq!(fp.rotation_size, expected_rotsize);
             assert_eq!(fp.rotation_maxfiles, expected_rotfiles);
@@ -231,7 +237,6 @@ mod tests {
             merger: Option<Box<dyn Merger>>,
         ) -> SyncSender<Vec<u8>> {
             let fp = FileOutput::new(&cfg);
-            let _ = fs::remove_file(self.file_base);
 
             // Create a sync data sender and start the file output task
             let (tx, rx): (SyncSender<Vec<u8>>, Receiver<Vec<u8>>) = sync_channel(128);
@@ -240,9 +245,8 @@ mod tests {
             tx
         }
 
-        fn teardown(&self) {
-            // Make sure to cleanup files that may have been created by the test
-            let _ = fs::remove_file(self.file_base);
+        fn get_file_base(&self) -> &str {
+            &self.file_base
         }
     }
 
@@ -284,9 +288,9 @@ mod tests {
     }
 
     #[test]
-    fn test_start_no_merger() {
+    fn test_start_no_merger() -> Result<()> {
         let file_base = "test_start_no_merger";
-        let test_object = WriterTest::new(file_base);
+        let test_object = WriterTest::new(file_base)?;
         let cfg =
             Config::from_string(&format!("[output]\nfile_path = \"{}\"\n", file_base)).unwrap();
         let tx = test_object.setup_start_thread(cfg, None);
@@ -299,12 +303,13 @@ mod tests {
             test_object.test_patterns[0]
         );
         let _ = fs::remove_file(file_base);
+        Ok(())
     }
 
     #[test]
-    fn test_start_with_merger() {
+    fn test_start_with_merger() -> Result<()> {
         let file_base = "test_start_with_merger";
-        let test_object = WriterTest::new(file_base);
+        let test_object = WriterTest::new(file_base)?;
         let cfg =
             Config::from_string(&format!("[output]\nfile_path = \"{}\"\n", file_base)).unwrap();
         let merger = Some(Box::new(LineMerger::new(&cfg)) as Box<dyn Merger>);
@@ -318,24 +323,25 @@ mod tests {
             format!("{}\n", test_object.test_patterns[0])
         );
         let _ = fs::remove_file(file_base);
+        Ok(())
     }
 
     #[test]
     #[should_panic(expected = "Cannot open file to /wrong/path/test_start_nofile")]
     fn test_start_nofile() {
         let file_base = "/wrong/path/test_start_nofile";
-        let test_object = WriterTest::new(file_base);
+        let test_object = WriterTest::new(file_base).unwrap();
         let cfg =
             Config::from_string(&format!("[output]\nfile_path = \"{}\"\n", file_base)).unwrap();
         let _ = test_object.setup_start_thread(cfg, None);
     }
 
     #[test]
-    fn test_log_rotate_nobuf() {
-        let test_object = WriterTest::new("test_log_rotate_nobuf");
+    fn test_log_rotate_nobuf() -> Result<()> {
+        let test_object = WriterTest::new("test_log_rotate_nobuf")?;
         let cfg = Config::from_string(&format!(
             "[output]\nfile_path = \"{}\"\nfile_rotation_size = 15\n",
-            test_object.file_base
+            test_object.get_file_base()
         ))
         .unwrap();
         let mut writer = test_object.setup_writer(
@@ -346,13 +352,13 @@ mod tests {
         );
 
         // We should have a RotatingFile instance unbuffered, check a 2 files are created after >15 bytes written
-        let file_rotated = &format!("{}.0", test_object.file_base);
+        let file_rotated = &format!("{}.0", test_object.get_file_base());
         let _ = fs::remove_file(file_rotated);
         let _ = writer.write_all(test_object.test_patterns[0].as_bytes());
         let _ = writer.write_all(test_object.test_patterns[1].as_bytes());
         let _ = writer.write_all(test_object.test_patterns[2].as_bytes());
         assert_eq!(
-            fs::read_to_string(test_object.file_base).unwrap(),
+            fs::read_to_string(test_object.get_file_base()).unwrap(),
             test_object.test_patterns[2]
         );
         assert_eq!(
@@ -363,18 +369,19 @@ mod tests {
             )
         );
 
-        test_object.teardown();
         let _ = fs::remove_file(file_rotated);
+        Ok(())
     }
 
     #[test]
-    fn test_log_rotate_buf() {
-        let test_object = WriterTest::new("test_log_rotate_buf");
-        let cfg = Config::from_string(&format!("[output]\nfile_path = \"{}\"\nfile_rotation_size = 15\nfile_buffer_size=10\nfile_rotation_maxfiles=6\n", test_object.file_base)).unwrap();
+    fn test_log_rotate_buf() -> Result<()> {
+        let test_object = WriterTest::new("test_log_rotate_buf")?;
+        let cfg = Config::from_string(&format!("[output]\nfile_path = \"{}\"\nfile_rotation_size = 15\nfile_buffer_size=10\nfile_rotation_maxfiles=6\n",
+                                               test_object.get_file_base())).unwrap();
         let mut writer = test_object.setup_writer(cfg, 15, 6, 10);
 
         // We should have a BufWriter<RotatingFile> instance, check no new file created after >file size
-        let file_rotated = &format!("{}.0", test_object.file_base);
+        let file_rotated = &format!("{}.0", test_object.get_file_base());
         let _ = fs::remove_file(file_rotated);
         let _ = writer.write(test_object.test_patterns[0].as_bytes());
         let _ = writer.write(test_object.test_patterns[1].as_bytes());
@@ -382,7 +389,7 @@ mod tests {
         // At this point, we wrote enough data to generate a rotation. but the last write should be buffered and not flushed. so no rotation yet
         let _ = writer.write(test_object.test_patterns[2].as_bytes());
         assert_eq!(
-            fs::read_to_string(test_object.file_base).unwrap(),
+            fs::read_to_string(test_object.get_file_base()).unwrap(),
             format!(
                 "{}{}",
                 test_object.test_patterns[0], test_object.test_patterns[1]
@@ -393,7 +400,7 @@ mod tests {
         let _ = writer.write(test_object.test_patterns[3].as_bytes());
 
         assert_eq!(
-            fs::read_to_string(test_object.file_base).unwrap(),
+            fs::read_to_string(test_object.get_file_base()).unwrap(),
             test_object.test_patterns[2]
         );
         assert_eq!(
@@ -404,27 +411,28 @@ mod tests {
             )
         );
 
-        test_object.teardown();
         let _ = fs::remove_file(file_rotated);
+        Ok(())
     }
 
     #[test]
-    fn test_log_rotate_nofile() {
-        let test_object = WriterTest::new("/wrong/path/test_log_rotate_buf");
+    fn test_log_rotate_nofile() -> Result<()> {
+        let test_object = WriterTest::new("/wrong/path/test_log_rotate_buf")?;
         let cfg = Config::from_string(&format!(
             "[output]\nfile_path = \"{}\"\nfile_rotation_size = 15\n",
-            test_object.file_base
+            test_object.get_file_base()
         ))
         .unwrap();
         test_object.setup_nowriter(cfg);
+        Ok(())
     }
 
     #[test]
-    fn test_log_norotate_nobuf() {
-        let test_object = WriterTest::new("test_log_norotate_nobuf");
+    fn test_log_norotate_nobuf() -> Result<()> {
+        let test_object = WriterTest::new("test_log_norotate_nobuf")?;
         let cfg = Config::from_string(&format!(
             "[output]\nfile_path = \"{}\"\n",
-            test_object.file_base
+            test_object.get_file_base()
         ))
         .unwrap();
         let mut writer = test_object.setup_writer(
@@ -437,27 +445,27 @@ mod tests {
         // We should have a File instance
         let _ = writer.write(test_object.test_patterns[0].as_bytes());
         assert_eq!(
-            fs::read_to_string(test_object.file_base).unwrap(),
+            fs::read_to_string(test_object.get_file_base()).unwrap(),
             test_object.test_patterns[0]
         );
         let _ = writer.write(test_object.test_patterns[1].as_bytes());
         assert_eq!(
-            fs::read_to_string(test_object.file_base).unwrap(),
+            fs::read_to_string(test_object.get_file_base()).unwrap(),
             format!(
                 "{}{}",
                 test_object.test_patterns[0], test_object.test_patterns[1]
             )
         );
 
-        test_object.teardown();
+        Ok(())
     }
 
     #[test]
-    fn test_log_norotate_buf() {
-        let test_object = WriterTest::new("test_log_norotate_buf");
+    fn test_log_norotate_buf() -> Result<()> {
+        let test_object = WriterTest::new("test_log_norotate_buf")?;
         let cfg = Config::from_string(&format!(
             "[output]\nfile_path = \"{}\"\nfile_buffer_size=10\n",
-            test_object.file_base
+            test_object.get_file_base()
         ))
         .unwrap();
         let mut writer = test_object.setup_writer(
@@ -469,25 +477,26 @@ mod tests {
 
         // We should have a BufWriter<File> instance. First write should not be flushed
         let _ = writer.write(test_object.test_patterns[0].as_bytes());
-        assert_eq!(fs::read_to_string(test_object.file_base).unwrap(), "");
+        assert_eq!(fs::read_to_string(test_object.get_file_base()).unwrap(), "");
         let _ = writer.write(test_object.test_patterns[1].as_bytes());
         assert_eq!(
-            fs::read_to_string(test_object.file_base).unwrap(),
+            fs::read_to_string(test_object.get_file_base()).unwrap(),
             test_object.test_patterns[0]
         );
 
-        test_object.teardown();
+        Ok(())
     }
 
     #[test]
-    fn test_log_norotate_nofile() {
-        let test_object = WriterTest::new("/wrong/path/test_log_rotate_buf");
+    fn test_log_norotate_nofile() -> Result<()> {
+        let test_object = WriterTest::new("/wrong/path/test_log_rotate_buf")?;
         let cfg = Config::from_string(&format!(
             "[output]\nfile_path = \"{}\"\n",
-            test_object.file_base
+            test_object.get_file_base()
         ))
         .unwrap();
         test_object.setup_nowriter(cfg);
+        Ok(())
     }
 
 }

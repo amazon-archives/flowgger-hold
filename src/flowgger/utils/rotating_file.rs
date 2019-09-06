@@ -174,6 +174,8 @@ impl Write for RotatingFile {
 #[cfg(test)]
 mod tests {
     use super::*;
+    extern crate tempdir;
+    use tempdir::TempDir;
 
     fn build_pattern_list(count: u32, length: usize) -> Vec<String> {
         let mut pattern_list = Vec::new();
@@ -188,29 +190,19 @@ mod tests {
     }
 
     #[test]
-    fn test_rotation_2files() {
-        let file_base = "test_log.log";
-        let file_rotated = "test_log.0";
-        let file_rotated2 = "test_log.1";
+    fn test_rotation_2files() -> Result<(), io::Error> {
+        let tmp_dir = TempDir::new("test_rotation")?;
+        let file_base = tmp_dir.path().join("test_log.log");
+        let file_rotated = tmp_dir.path().join("test_log.0");
+        let file_rotated2 = tmp_dir.path().join("test_log.1");
 
         let test_patterns = build_pattern_list(7, 6);
 
-        // Make sure the files have been removed
-        let _ = fs::remove_file(file_base);
-        let _ = fs::remove_file(file_rotated);
-        let _ = fs::remove_file(file_rotated2);
-
-        let mut rotating_file = RotatingFile::new(file_base, 16, 2);
+        let mut rotating_file = RotatingFile::new(&file_base, 16, 2);
         let result = rotating_file.open();
         if result.is_err() {
-            println!("Error opening log file {}: {}", file_base, result.unwrap_err());
-            let result2 = fs::write("d.d", "test");
-            if result2.is_err() {
-                println!("Error opening local file: {}", result2.unwrap_err());
-            }
-            else {
-                let _ = fs::remove_file("d.d");
-            }
+            println!("Error opening log file {}: {}", file_base.to_string_lossy(), result.unwrap_err());
+            fs::write("d.d", "test")?;
         }
         assert!(rotating_file.open().is_ok());
 
@@ -218,50 +210,47 @@ mod tests {
         let _ = rotating_file.write(test_patterns[0].as_bytes());
         let _ = rotating_file.write(test_patterns[1].as_bytes());
         assert_eq!(
-            fs::read_to_string(file_base).unwrap(),
+            fs::read_to_string(file_base.as_path()).unwrap(),
             format!("{}{}", test_patterns[0], test_patterns[1])
         );
 
         // First rotation
         let _ = rotating_file.write(test_patterns[2].as_bytes());
         assert_eq!(
-            fs::read_to_string(file_rotated).unwrap(),
+            fs::read_to_string(file_rotated.as_path()).unwrap(),
             format!("{}{}", test_patterns[0], test_patterns[1])
         );
-        assert_eq!(fs::read_to_string(file_base).unwrap(), test_patterns[2]);
+        assert_eq!(fs::read_to_string(file_base.as_path()).unwrap(), test_patterns[2]);
 
         // Second rotation
         let _ = rotating_file.write(test_patterns[3].as_bytes());
         let _ = rotating_file.write(test_patterns[4].as_bytes());
         assert_eq!(
-            fs::read_to_string(file_rotated2).unwrap(),
+            fs::read_to_string(file_rotated2.as_path()).unwrap(),
             format!("{}{}", test_patterns[0], test_patterns[1])
         );
         assert_eq!(
-            fs::read_to_string(file_rotated).unwrap(),
+            fs::read_to_string(file_rotated.as_path()).unwrap(),
             format!("{}{}", test_patterns[2], test_patterns[3])
         );
-        assert_eq!(fs::read_to_string(file_base).unwrap(), test_patterns[4]);
+        assert_eq!(fs::read_to_string(file_base.as_path()).unwrap(), test_patterns[4]);
 
         // Oldest log overwritten
         let _ = rotating_file.write(test_patterns[5].as_bytes());
         let _ = rotating_file.write(test_patterns[6].as_bytes());
         assert_eq!(
-            fs::read_to_string(file_rotated2).unwrap(),
+            fs::read_to_string(file_rotated2.as_path()).unwrap(),
             format!("{}{}", test_patterns[2], test_patterns[3])
         );
         assert_eq!(
-            fs::read_to_string(file_rotated).unwrap(),
+            fs::read_to_string(file_rotated.as_path()).unwrap(),
             format!("{}{}", test_patterns[4], test_patterns[5])
         );
         assert_eq!(fs::read_to_string(file_base).unwrap(), test_patterns[6]);
 
         let _ = rotating_file.flush();
 
-        // Cleanup our mess
-        let _ = fs::remove_file(file_base);
-        let _ = fs::remove_file(file_rotated);
-        let _ = fs::remove_file(file_rotated2);
+        Ok(())
     }
 
     #[test]
