@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_rotation_2files() {
-        let file_base = "/f/test_log.log";
+        let file_base = "test_log.log";
         let file_rotated = "test_log.0";
         let file_rotated2 = "test_log.1";
 
