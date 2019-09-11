@@ -185,4 +185,18 @@ mod tests {
             expected_msg
         );
     }
+
+    #[test]
+    #[should_panic(expected = "output.gelf_extra must be a list of key/value pairs")]
+    fn test_gelf_encoder_config_extra_should_be_section() {
+        let _encoder =
+            GelfEncoder::new(&Config::from_string("[output]\ngelf_extra = \"bar\"").unwrap());
+    }
+
+    #[test]
+    #[should_panic(expected = "output.gelf_extra values must be strings")]
+    fn test_gelf_encoder_config_extra_bad_type() {
+        let _encoder =
+            GelfEncoder::new(&Config::from_string("[output.gelf_extra]\n_some_info = 42").unwrap());
+    }
 }
