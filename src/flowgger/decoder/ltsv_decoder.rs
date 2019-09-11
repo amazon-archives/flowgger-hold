@@ -246,204 +246,273 @@ fn parse_ts(line: &str) -> Result<f64, &'static str> {
         .or_else(|_| english_time_to_unix(line))
 }
 
-#[test]
-fn test_ltsv_suffixes() {
-    let config = Config::from_string(
-        "[input]\n[input.ltsv_schema]\ncounter = \"U64\"\nscore = \
-         \"I64\"\nmean = \"f64\"\ndone = \
-         \"bool\"\n[input.ltsv_suffixes]\nu64 = \"_u64\"\ni64 = \
-         \"_i64\"\nF64 = \"_f64\"\nBool = \"_bool\"\n",
-    );
-    let ltsv_decoder = LTSVDecoder::new(&config.unwrap());
-    let msg = "time:[10/Oct/2000:13:55:36 \
-               -0700]\tdone:true\tscore:-1\tmean:0.42\tcounter:42\tlevel:3\thost:\
-               testhostname\tname1:value1\tname 2: value 2\tn3:v3\tmessage:this is a test";
-    let res = ltsv_decoder.decode(msg).unwrap();
-    let sd = res.sd.unwrap();
-    let pairs = sd.pairs;
-    assert!(pairs
-        .iter()
-        .cloned()
-        .any(|(k, v)| if let SDValue::U64(v) = v {
-            k == "_counter_u64" && v == 42
-        } else {
-            false
-        }));
-    assert!(pairs
-        .iter()
-        .cloned()
-        .any(|(k, v)| if let SDValue::I64(v) = v {
-            k == "_score_i64" && v == -1
-        } else {
-            false
-        }));
-    assert!(pairs
-        .iter()
-        .cloned()
-        .any(|(k, v)| if let SDValue::F64(v) = v {
-            k == "_mean_f64" && f64::abs(v - 0.42) < 1e-5
-        } else {
-            false
-        }));
-    assert!(pairs
-        .iter()
-        .cloned()
-        .any(|(k, v)| if let SDValue::Bool(v) = v {
-            k == "_done_bool" && v
-        } else {
-            false
-        }));
-}
+#[cfg(test)]
+mod test {
 
-#[test]
-fn test_ltsv_suffixes_2() {
-    let config = Config::from_string(
-        "[input]\n[input.ltsv_schema]\ncounter_u64 = \
-         \"U64\"\nscore_i64 = \"I64\"\nmean_f64 = \
-         \"f64\"\ndone_bool = \"bool\"\n[input.ltsv_suffixes]\nu64 \
-         = \"_u64\"\ni64 = \"_i64\"\nf64 = \"_f64\"\nbool = \
-         \"_bool\"\n",
-    );
-    let ltsv_decoder = LTSVDecoder::new(&config.unwrap());
-    let msg = "time:[10/Oct/2000:13:55:36 \
-               -0700]\tdone_bool:true\tscore_i64:-1\tmean_f64:0.42\tcounter_u64:42\tlevel:3\thost:\
-               testhostname\tname1:value1\tname 2: value 2\tn3:v3\tmessage:this is a test";
-    let res = ltsv_decoder.decode(msg).unwrap();
-    let sd = res.sd.unwrap();
-    let pairs = sd.pairs;
-    assert!(pairs
-        .iter()
-        .cloned()
-        .any(|(k, v)| if let SDValue::U64(v) = v {
-            k == "_counter_u64" && v == 42
-        } else {
-            false
-        }));
-    assert!(pairs
-        .iter()
-        .cloned()
-        .any(|(k, v)| if let SDValue::I64(v) = v {
-            k == "_score_i64" && v == -1
-        } else {
-            false
-        }));
-    assert!(pairs
-        .iter()
-        .cloned()
-        .any(|(k, v)| if let SDValue::F64(v) = v {
-            k == "_mean_f64" && f64::abs(v - 0.42) < 1e-5
-        } else {
-            false
-        }));
-    assert!(pairs
-        .iter()
-        .cloned()
-        .any(|(k, v)| if let SDValue::Bool(v) = v {
-            k == "_done_bool" && v
-        } else {
-            false
-        }));
-}
+    use super::*;
 
-#[test]
-fn test_ltsv() {
-    let config = Config::from_string(
-        "[input]\n[input.ltsv_schema]\ncounter = \"u64\"\nscore = \
-         \"i64\"\nmean = \"f64\"\ndone = \"bool\"\n",
-    );
-    let ltsv_decoder = LTSVDecoder::new(&config.unwrap());
-    let msg = "time:1438790025.99\thost:testhostname\tname1:value1\tname 2: value \
-               2\tn3:v3";
-    let res = ltsv_decoder.decode(msg).unwrap();
-    assert!(res.ts == 1_438_790_025.99);
-}
+    #[test]
+    fn test_ltsv_decoder_suffixes() {
+        let config = Config::from_string(
+            "[input]\n[input.ltsv_schema]\ncounter = \"U64\"\nscore = \
+             \"I64\"\nmean = \"f64\"\ndone = \
+             \"bool\"\n[input.ltsv_suffixes]\nu64 = \"_u64\"\ni64 = \
+             \"_i64\"\nF64 = \"_f64\"\nBool = \"_bool\"\n",
+        );
+        let ltsv_decoder = LTSVDecoder::new(&config.unwrap());
+        let msg = "time:[10/Oct/2000:13:55:36 \
+                   -0700]\tdone:true\tscore:-1\tmean:0.42\tcounter:42\tlevel:3\thost:\
+                   testhostname\tname1:value1\tname 2: value 2\tn3:v3\tmessage:this is a test";
+        let res = ltsv_decoder.decode(msg).unwrap();
+        let sd = res.sd.unwrap();
+        let pairs = sd.pairs;
+        assert!(pairs
+            .iter()
+            .cloned()
+            .any(|(k, v)| if let SDValue::U64(v) = v {
+                k == "_counter_u64" && v == 42
+            } else {
+                false
+            }));
+        assert!(pairs
+            .iter()
+            .cloned()
+            .any(|(k, v)| if let SDValue::I64(v) = v {
+                k == "_score_i64" && v == -1
+            } else {
+                false
+            }));
+        assert!(pairs
+            .iter()
+            .cloned()
+            .any(|(k, v)| if let SDValue::F64(v) = v {
+                k == "_mean_f64" && f64::abs(v - 0.42) < 1e-5
+            } else {
+                false
+            }));
+        assert!(pairs
+            .iter()
+            .cloned()
+            .any(|(k, v)| if let SDValue::Bool(v) = v {
+                k == "_done_bool" && v
+            } else {
+                false
+            }));
+    }
 
-#[test]
-fn test_ltsv2() {
-    let config = Config::from_string(
-        "[input]\n[input.ltsv_schema]\ncounter = \"u64\"\nscore = \
-         \"i64\"\nmean = \"f64\"\ndone = \"bool\"\n",
-    );
-    let ltsv_decoder = LTSVDecoder::new(&config.unwrap());
-    let msg = "time:[2015-08-05T15:53:45.637824Z]\thost:testhostname\tname1:value1\tname 2: value \
-               2\tn3:v3";
-    let res = ltsv_decoder.decode(msg).unwrap();
-    println!("{}", res.ts);
-    assert!(res.ts == 1_438_790_025.637_824);
-}
+    #[test]
+    fn test_ltsv_decoder_suffixes_2() {
+        let config = Config::from_string(
+            "[input]\n[input.ltsv_schema]\ncounter_u64 = \
+             \"U64\"\nscore_i64 = \"I64\"\nmean_f64 = \
+             \"f64\"\ndone_bool = \"bool\"\n[input.ltsv_suffixes]\nu64 \
+             = \"_u64\"\ni64 = \"_i64\"\nf64 = \"_f64\"\nbool = \
+             \"_bool\"\n",
+        );
+        let ltsv_decoder = LTSVDecoder::new(&config.unwrap());
+        let msg =
+            "time:[10/Oct/2000:13:55:36 \
+             -0700]\tdone_bool:true\tscore_i64:-1\tmean_f64:0.42\tcounter_u64:42\tlevel:3\thost:\
+             testhostname\tname1:value1\tname 2: value 2\tn3:v3\tmessage:this is a test";
+        let res = ltsv_decoder.decode(msg).unwrap();
+        let sd = res.sd.unwrap();
+        let pairs = sd.pairs;
+        assert!(pairs
+            .iter()
+            .cloned()
+            .any(|(k, v)| if let SDValue::U64(v) = v {
+                k == "_counter_u64" && v == 42
+            } else {
+                false
+            }));
+        assert!(pairs
+            .iter()
+            .cloned()
+            .any(|(k, v)| if let SDValue::I64(v) = v {
+                k == "_score_i64" && v == -1
+            } else {
+                false
+            }));
+        assert!(pairs
+            .iter()
+            .cloned()
+            .any(|(k, v)| if let SDValue::F64(v) = v {
+                k == "_mean_f64" && f64::abs(v - 0.42) < 1e-5
+            } else {
+                false
+            }));
+        assert!(pairs
+            .iter()
+            .cloned()
+            .any(|(k, v)| if let SDValue::Bool(v) = v {
+                k == "_done_bool" && v
+            } else {
+                false
+            }));
+    }
 
-#[test]
-fn test_ltsv_3() {
-    let config = Config::from_string(
-        "[input]\n[input.ltsv_schema]\ncounter = \"u64\"\nscore = \
-         \"i64\"\nmean = \"f64\"\ndone = \"bool\"\n",
-    );
-    let ltsv_decoder = LTSVDecoder::new(&config.unwrap());
-    let msg = "time:[10/Oct/2000:13:55:36.3 \
-               -0700]\tdone:true\tscore:-1\tmean:0.42\tcounter:42\tlevel:3\thost:\
-               testhostname\tname1:value1\tname 2: value 2\tn3:v3\tmessage:this is a test";
-    let res = ltsv_decoder.decode(msg).unwrap();
-    assert!(res.ts == 971_211_336.3);
-    assert!(res.severity.unwrap() == 3);
+    #[test]
+    fn test_ltsv_decoder() {
+        let config = Config::from_string(
+            "[input]\n[input.ltsv_schema]\ncounter = \"u64\"\nscore = \
+             \"i64\"\nmean = \"f64\"\ndone = \"bool\"\n",
+        );
+        let ltsv_decoder = LTSVDecoder::new(&config.unwrap());
+        let msg = "time:1438790025.99\thost:testhostname\tname1:value1\tname 2: value \
+                   2\tn3:v3";
+        let res = ltsv_decoder.decode(msg).unwrap();
+        assert!(res.ts == 1_438_790_025.99);
+    }
 
-    assert!(res.hostname == "testhostname");
-    assert!(res.msg.unwrap() == "this is a test");
-    let sd = res.sd.unwrap();
-    let pairs = sd.pairs;
-    assert!(pairs
-        .iter()
-        .cloned()
-        .any(|(k, v)| if let SDValue::String(v) = v {
-            k == "_name1" && v == "value1"
-        } else {
-            false
-        }));
-    assert!(pairs
-        .iter()
-        .cloned()
-        .any(|(k, v)| if let SDValue::String(v) = v {
-            k == "_name 2" && v == " value 2"
-        } else {
-            false
-        }));
-    assert!(pairs
-        .iter()
-        .cloned()
-        .any(|(k, v)| if let SDValue::String(v) = v {
-            k == "_n3" && v == "v3"
-        } else {
-            false
-        }));
-    assert!(pairs
-        .iter()
-        .cloned()
-        .any(|(k, v)| if let SDValue::U64(v) = v {
-            k == "_counter" && v == 42
-        } else {
-            false
-        }));
-    assert!(pairs
-        .iter()
-        .cloned()
-        .any(|(k, v)| if let SDValue::I64(v) = v {
-            k == "_score" && v == -1
-        } else {
-            false
-        }));
-    assert!(pairs
-        .iter()
-        .cloned()
-        .any(|(k, v)| if let SDValue::F64(v) = v {
-            k == "_mean" && f64::abs(v - 0.42) < 1e-5
-        } else {
-            false
-        }));
-    assert!(pairs
-        .iter()
-        .cloned()
-        .any(|(k, v)| if let SDValue::Bool(v) = v {
-            k == "_done" && v == true
-        } else {
-            false
-        }));
+    #[test]
+    fn test_ltsv_decoder2() {
+        let config = Config::from_string(
+            "[input]\n[input.ltsv_schema]\ncounter = \"u64\"\nscore = \
+             \"i64\"\nmean = \"f64\"\ndone = \"bool\"\n",
+        );
+        let ltsv_decoder = LTSVDecoder::new(&config.unwrap());
+        let msg =
+            "time:[2015-08-05T15:53:45.637824Z]\thost:testhostname\tname1:value1\tname 2: value \
+             2\tn3:v3";
+        let res = ltsv_decoder.decode(msg).unwrap();
+        println!("{}", res.ts);
+        assert!(res.ts == 1_438_790_025.637_824);
+    }
+
+    #[test]
+    fn test_ltsv_decoder_3() {
+        let config = Config::from_string(
+            "[input]\n[input.ltsv_schema]\ncounter = \"u64\"\nscore = \
+             \"i64\"\nmean = \"f64\"\ndone = \"bool\"\n",
+        );
+        let ltsv_decoder = LTSVDecoder::new(&config.unwrap());
+        let msg = "time:[10/Oct/2000:13:55:36.3 \
+                   -0700]\tdone:true\tscore:-1\tmean:0.42\tcounter:42\tlevel:3\thost:\
+                   testhostname\tname1:value1\tname 2: value 2\tn3:v3\tmessage:this is a test";
+        let res = ltsv_decoder.decode(msg).unwrap();
+        assert!(res.ts == 971_211_336.3);
+        assert!(res.severity.unwrap() == 3);
+
+        assert!(res.hostname == "testhostname");
+        assert!(res.msg.unwrap() == "this is a test");
+        let sd = res.sd.unwrap();
+        let pairs = sd.pairs;
+        assert!(pairs
+            .iter()
+            .cloned()
+            .any(|(k, v)| if let SDValue::String(v) = v {
+                k == "_name1" && v == "value1"
+            } else {
+                false
+            }));
+        assert!(pairs
+            .iter()
+            .cloned()
+            .any(|(k, v)| if let SDValue::String(v) = v {
+                k == "_name 2" && v == " value 2"
+            } else {
+                false
+            }));
+        assert!(pairs
+            .iter()
+            .cloned()
+            .any(|(k, v)| if let SDValue::String(v) = v {
+                k == "_n3" && v == "v3"
+            } else {
+                false
+            }));
+        assert!(pairs
+            .iter()
+            .cloned()
+            .any(|(k, v)| if let SDValue::U64(v) = v {
+                k == "_counter" && v == 42
+            } else {
+                false
+            }));
+        assert!(pairs
+            .iter()
+            .cloned()
+            .any(|(k, v)| if let SDValue::I64(v) = v {
+                k == "_score" && v == -1
+            } else {
+                false
+            }));
+        assert!(pairs
+            .iter()
+            .cloned()
+            .any(|(k, v)| if let SDValue::F64(v) = v {
+                k == "_mean" && f64::abs(v - 0.42) < 1e-5
+            } else {
+                false
+            }));
+        assert!(pairs
+            .iter()
+            .cloned()
+            .any(|(k, v)| if let SDValue::Bool(v) = v {
+                k == "_done" && v == true
+            } else {
+                false
+            }));
+    }
+
+    #[test]
+    #[should_panic(expected = "Unable to parse the date")]
+    fn test_ltsv_decoder_bad_timestamp() {
+        let config = Config::from_string(
+            "[input]\n[input.ltsv_schema]\ncounter = \"u64\"\nscore = \
+             \"i64\"\nmean = \"f64\"\ndone = \"bool\"\n",
+        );
+        let ltsv_decoder = LTSVDecoder::new(&config.unwrap());
+        // msg has a bad timestamp (using number to indicate month instead of three letter format
+        let msg = "time:[10/8/2000:13:55:36.3 \
+                   -0700]\tdone:true\tscore:-1\tmean:0.42\tcounter:42\tlevel:3\thost:\
+                   testhostname\tname1:value1\tname 2: value 2\tn3:v3\tmessage:this is a test";
+        let _res = ltsv_decoder.decode(msg).unwrap();
+    }
+
+    #[test]
+    fn test_ltsv_decoder_bad_security_level() {
+        let config = Config::from_string(
+            "[input]\n[input.ltsv_schema]\ncounter = \"u64\"\nscore = \
+             \"i64\"\nmean = \"f64\"\ndone = \"bool\"\n",
+        );
+        let ltsv_decoder = LTSVDecoder::new(&config.unwrap());
+        let msg = "time:[10/Oct/2000:13:55:36.3 \
+                   -0700]\tdone:true\tscore:-1\tmean:0.42\tcounter:42\tlevel:8\thost:\
+                   testhostname\tname1:value1\tname 2: value 2\tn3:v3\tmessage:this is a test";
+        assert_eq!(
+            ltsv_decoder.decode(msg).unwrap_err(),
+            "Severity level should be <= 7"
+        );
+        let msg = "time:[10/Oct/2000:13:55:36.3 \
+                   -0700]\tdone:true\tscore:-1\tmean:0.42\tcounter:42\tlevel:-1\thost:\
+                   testhostname\tname1:value1\tname 2: value 2\tn3:v3\tmessage:this is a test";
+        assert_eq!(
+            ltsv_decoder.decode(msg).unwrap_err(),
+            "Invalid severity level"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Unsupported type in input.ltsv_schema for name [counter]")]
+    fn test_ltsv_decoder_bad_config_schema_name() {
+        let config = Config::from_string(
+            "[input]\n[input.ltsv_schema]\ncounter = \"apples\"\nscore = \
+             \"i64\"\nmean = \"f64\"\ndone = \"bool\"\n",
+        );
+        let _ltsv_decoder = LTSVDecoder::new(&config.unwrap());
+    }
+
+    #[test]
+    #[should_panic(expected = "Unsupported type in input.ltsv_suffixes for type [apples]")]
+    fn test_ltsv_decoder_bad_config_suffix_name() {
+        let config = Config::from_string(
+            "[input]\n[input.ltsv_schema]\ncounter_u64 = \
+             \"U64\"\nscore_i64 = \"I64\"\nmean_f64 = \
+             \"f64\"\ndone_bool = \"bool\"\n[input.ltsv_suffixes]\napples \
+             = \"_u64\"\ni64 = \"_i64\"\nf64 = \"_f64\"\nbool = \
+             \"_bool\"\n",
+        );
+        let _ltsv_decoder = LTSVDecoder::new(&config.unwrap());
+    }
 }
