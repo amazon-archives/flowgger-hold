@@ -1,6 +1,7 @@
 use super::Encoder;
 use crate::flowgger::config::Config;
 use crate::flowgger::record::{Record, SDValue};
+use std::collections::BTreeMap;
 
 #[derive(Clone)]
 pub struct LTSVEncoder {
@@ -29,36 +30,43 @@ impl LTSVEncoder {
     }
 }
 
+fn escape_string(field: &str) -> String {
+    if field.chars().any(|s| s == '\n' || s == '\t' || s == ':') {
+        field
+            .replace("\n", " ")
+            .replace("\t", " ")
+            .replace(":", "_")
+    } else {
+        field.to_string()
+    }
+}
+
 struct LTSVString {
-    out: String,
+    out: BTreeMap<String, String>,
 }
 
 impl LTSVString {
     pub fn new() -> LTSVString {
-        LTSVString { out: String::new() }
+        LTSVString {
+            out: BTreeMap::new(),
+        }
     }
 
     pub fn insert(&mut self, key: &str, value: &str) {
-        if !self.out.is_empty() {
-            self.out.push('\t');
-        }
-        if key.chars().any(|s| s == '\n' || s == '\t' || s == ':') {
-            let key_esc = key.replace("\n", " ").replace("\t", " ").replace(":", "_");
-            self.out.push_str(&key_esc);
-        } else {
-            self.out.push_str(key);
-        };
-        self.out.push(':');
-        if value.chars().any(|s| s == '\n' || s == '\t') {
-            let value_esc = value.replace("\t", " ").replace("\n", " ");
-            self.out.push_str(&value_esc);
-        } else {
-            self.out.push_str(value);
-        };
+        let key_escaped = &escape_string(key);
+        let value_escaped = &escape_string(value);
+        self.out
+            .entry(key_escaped.to_string())
+            .and_modify(|v| *v = value_escaped.to_string())
+            .or_insert_with(|| value_escaped.to_string());
     }
 
     pub fn finalize(self) -> String {
-        self.out
+        let mut final_line = String::new();
+        for (key, value) in &self.out {
+            final_line.push_str(&format!("{}:{}\t", &key, &value))
+        }
+        final_line.trim_end().to_string()
     }
 }
 
@@ -114,5 +122,81 @@ impl Encoder for LTSVEncoder {
             res.insert("msgid", &msgid);
         }
         Ok(res.finalize().into_bytes())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::flowgger::record::{SDValue, StructuredData};
+
+    #[test]
+    fn test_ltsv_encoder() {
+        let expected_msg =
+            "a_key:bar\tappname:appname\tfull_message:Backtrace   here with more\thost:example.org\tlevel:1\tmessage:A short message\tmsgid:msg_id\tprocid:44\tsome_info:foo\ttime:1385053862.3072";
+        let config = Config::from_string("[output.ltsv_extra]\na_key = \"bar\"").unwrap();
+        let sd = StructuredData {
+            sd_id: Some("someid".to_string()),
+            pairs: vec![("some_info".to_string(), SDValue::String("foo".to_string()))],
+        };
+        let record = Record {
+            ts: 1385053862.3072,
+            hostname: "example.org".to_string(),
+            facility: None,
+            severity: Some(1),
+            appname: Some("appname".to_string()),
+            procid: Some("44".to_string()),
+            msgid: Some("msg_id".to_string()),
+            msg: Some("A short message".to_string()),
+            full_msg: Some("Backtrace\n\n here\nwith more".to_string()),
+            sd: Some(sd),
+        };
+        let encoder = LTSVEncoder::new(&config);
+        assert_eq!(
+            String::from_utf8_lossy(&encoder.encode(record).unwrap()),
+            expected_msg
+        );
+    }
+
+    #[test]
+    fn test_ltsv_encoder_replace_extra() {
+        let expected_msg =
+            "host:example.org\tlevel:1\tmessage:A short message\tsome_info:bar\ttime:1385053862.3072";
+        let config = Config::from_string("[output.ltsv_extra]\n_some_info = \"bar\"").unwrap();
+        let sd = StructuredData {
+            sd_id: Some("someid".to_string()),
+            pairs: vec![("_some_info".to_string(), SDValue::String("foo".to_string()))],
+        };
+        let record = Record {
+            ts: 1385053862.3072,
+            hostname: "example.org".to_string(),
+            facility: None,
+            severity: Some(1),
+            appname: None,
+            procid: None,
+            msgid: None,
+            msg: Some("A short message".to_string()),
+            full_msg: None,
+            sd: Some(sd),
+        };
+        let encoder = LTSVEncoder::new(&config);
+        assert_eq!(
+            String::from_utf8_lossy(&encoder.encode(record).unwrap()),
+            expected_msg
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "output.ltsv_extra must be a list of key/value pairs")]
+    fn test_ltsv_encoder_config_extra_should_be_section() {
+        let _encoder =
+            LTSVEncoder::new(&Config::from_string("[output]\nltsv_extra = \"bar\"").unwrap());
+    }
+
+    #[test]
+    #[should_panic(expected = "output.ltsv_extra values must be strings")]
+    fn test_ltsv_encoder_config_extra_bad_type() {
+        let _encoder =
+            LTSVEncoder::new(&Config::from_string("[output.ltsv_extra]\n_some_info = 42").unwrap());
     }
 }
