@@ -4,11 +4,25 @@ use crate::flowgger::record::{Record, SDValue};
 use std::collections::BTreeMap;
 
 #[derive(Clone)]
+/// LTSVEncoder encodes records to strings in the LTSV format
 pub struct LTSVEncoder {
     extra: Vec<(String, String)>,
 }
 
 impl LTSVEncoder {
+    /// LTSV Encoder constructor from parsing the output.gelf_extra section of the config
+    ///
+    /// # Parameters
+    ///
+    /// - `config`: a configuration file that can contain an output.ltsv_extra section of elements,
+    /// or be empty. if the ltsv_extra section is present it needs to contain a list of `key =
+    /// "value"` pairs that will be added to the resulting json or overwritten if already present
+    ///
+    /// # Panics
+    ///
+    /// All the possible failures are relative to parsing the configuration file
+    /// - `output.ltsv_extra must be a list of key/value pairs`
+    /// - `output.ltsv_extra values must be strings`
     pub fn new(config: &Config) -> LTSVEncoder {
         let extra = match config.lookup("output.ltsv_extra") {
             None => Vec::new(),
@@ -30,6 +44,7 @@ impl LTSVEncoder {
     }
 }
 
+// Support function for escaping strings as needed
 fn escape_string(field: &str) -> String {
     if field.chars().any(|s| s == '\n' || s == '\t' || s == ':') {
         field
@@ -41,6 +56,7 @@ fn escape_string(field: &str) -> String {
     }
 }
 
+// Support structor to generate an LTSV String from a Record
 struct LTSVString {
     out: BTreeMap<String, String>,
 }
@@ -52,6 +68,8 @@ impl LTSVString {
         }
     }
 
+    // Insert a key and a value inside the BTreeMap, after escaping it, if the value already exist
+    // it will be overriden
     pub fn insert(&mut self, key: &str, value: &str) {
         let key_escaped = &escape_string(key);
         let value_escaped = &escape_string(value);
@@ -61,6 +79,7 @@ impl LTSVString {
             .or_insert_with(|| value_escaped.to_string());
     }
 
+    // From the BTreeMap generate an LTSV String in the format key:value\t after trimming the final \t
     pub fn finalize(self) -> String {
         let mut final_line = String::new();
         for (key, value) in &self.out {
@@ -71,6 +90,11 @@ impl LTSVString {
 }
 
 impl Encoder for LTSVEncoder {
+    /// Implements encode for GELF output types
+    ///
+    /// # Returns
+    /// An `Ok` Containing a byte vector rapresenting a valid LTSV String
+    /// There's not controlled situation where this method return an Err
     fn encode(&self, record: Record) -> Result<Vec<u8>, &'static str> {
         let mut res = LTSVString::new();
         if let Some(sd) = record.sd {
